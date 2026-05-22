@@ -1,0 +1,115 @@
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id            Int            @id @default(autoincrement())
+  name          String
+  email         String         @unique
+  password      String
+  role          String         @default("CLIENT") // "SUPERADMIN", "ADMIN", "CLIENT"
+  cinemaId      Int?
+  cinema        Cinema?        @relation(fields: [cinemaId], references: [id], onDelete: SetNull)
+  tickets       Ticket[]
+  reviews       Review[]
+  movieRequests MovieRequest[]
+  votes         RequestVote[]
+  createdAt     DateTime       @default(now())
+}
+
+model Cinema {
+  id        Int        @id @default(autoincrement())
+  name      String
+  slug      String     @unique // Subdomain or identifier, e.g. "cineplex-central"
+  address   String
+  users     User[]
+  movies    Movie[]
+  showtimes Showtime[]
+  createdAt DateTime   @default(now())
+}
+
+model Movie {
+  id          Int        @id @default(autoincrement())
+  title       String
+  description String
+  duration    Int        // in minutes
+  rating      String     // e.g. "G", "PG", "PG-13", "R"
+  genre       String
+  imageUrl    String
+  cinemaId    Int
+  cinema      Cinema     @relation(fields: [cinemaId], references: [id], onDelete: Cascade)
+  showtimes   Showtime[]
+  reviews     Review[]
+  createdAt   DateTime   @default(now())
+}
+
+model Showtime {
+  id          Int      @id @default(autoincrement())
+  movieId     Int
+  movie       Movie    @relation(fields: [movieId], references: [id], onDelete: Cascade)
+  roomName    String   // e.g. "Sala 1", "Sala 3D"
+  startTime   DateTime
+  ticketPrice Float
+  rows        Int      @default(8)   // Number of rows in the seating grid
+  cols        Int      @default(10)  // Number of columns in the seating grid
+  cinemaId    Int
+  cinema      Cinema   @relation(fields: [cinemaId], references: [id], onDelete: Cascade)
+  tickets     Ticket[]
+  createdAt   DateTime @default(now())
+}
+
+model Ticket {
+  id         Int      @id @default(autoincrement())
+  showtimeId Int
+  showtime   Showtime @relation(fields: [showtimeId], references: [id], onDelete: Cascade)
+  userId     Int
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  row        Int
+  col        Int
+  seatLabel  String   // e.g. "C-4"
+  status     String   @default("CONFIRMED") // "PENDING", "CONFIRMED", "CANCELLED"
+  pricePaid  Float
+  createdAt  DateTime @default(now())
+
+  @@unique([showtimeId, row, col]) // Prevents double booking of the exact same seat
+}
+
+model Review {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  movieId   Int
+  movie     Movie    @relation(fields: [movieId], references: [id], onDelete: Cascade)
+  comment   String
+  rating    Int      // 1 to 5 stars
+  createdAt DateTime @default(now())
+
+  @@unique([userId, movieId]) // One review per user per movie
+}
+
+model MovieRequest {
+  id          Int           @id @default(autoincrement())
+  userId      Int
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title       String
+  description String?
+  votes       RequestVote[]
+  status      String        @default("PENDING") // "PENDING", "APPROVED", "REJECTED"
+  createdAt   DateTime      @default(now())
+}
+
+model RequestVote {
+  id         Int          @id @default(autoincrement())
+  requestId  Int
+  request    MovieRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  userId     Int
+  user       User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt  DateTime     @default(now())
+
+  @@unique([requestId, userId]) // One vote per user per request
+}
