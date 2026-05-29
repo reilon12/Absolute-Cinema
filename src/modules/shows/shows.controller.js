@@ -31,6 +31,8 @@ const getShowtimes = async (req, res) => {
         movie: {
           select: {
             title: true,
+            description: true,
+            genre: true,
             imageUrl: true,
             duration: true,
             rating: true,
