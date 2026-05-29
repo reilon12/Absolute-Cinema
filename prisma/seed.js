@@ -7,9 +7,21 @@ async function main() {
   console.log('Starting seeding database...');
 
   // Clean up database
+  await prisma.reviewLike.deleteMany({});
+  await prisma.requestVote.deleteMany({});
+  await prisma.userReward.deleteMany({});
+  await prisma.userBadge.deleteMany({});
+  await prisma.socialActivity.deleteMany({});
+  await prisma.follow.deleteMany({});
+  await prisma.movieRequest.deleteMany({});
+  await prisma.watchlistItem.deleteMany({});
+  await prisma.review.deleteMany({});
   await prisma.ticket.deleteMany({});
   await prisma.showtime.deleteMany({});
   await prisma.movie.deleteMany({});
+  await prisma.reward.deleteMany({});
+  await prisma.badge.deleteMany({});
+  await prisma.event.deleteMany({});
   await prisma.user.deleteMany({});
   await prisma.cinema.deleteMany({});
 
@@ -56,7 +68,8 @@ async function main() {
       duration: 148,
       rating: 'PG-13',
       genre: 'Ciencia Ficción / Acción',
-      imageUrl: 'https://images.unsplash.com/photo-1536440136628-849c177e76a1?auto=format&fit=crop&w=600&q=80', // Cinema aesthetic
+      genres: ['Ciencia Ficción', 'Acción', 'Thriller'],
+      imageUrl: 'https://images.unsplash.com/photo-1536440136628-849c177e76a1?auto=format&fit=crop&w=600&q=80',
       cinemaId: centralCinema.id,
     },
   });
@@ -68,6 +81,7 @@ async function main() {
       duration: 140,
       rating: 'PG',
       genre: 'Animación / Aventura',
+      genres: ['Animación', 'Aventura', 'Superhéroes'],
       imageUrl: 'https://images.unsplash.com/photo-1635805737707-575885ab0820?auto=format&fit=crop&w=600&q=80',
       cinemaId: centralCinema.id,
     },
@@ -80,6 +94,7 @@ async function main() {
       duration: 169,
       rating: 'PG-13',
       genre: 'Ciencia Ficción / Drama',
+      genres: ['Ciencia Ficción', 'Drama', 'Aventura'],
       imageUrl: 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&w=600&q=80',
       cinemaId: centralCinema.id,
     },
@@ -87,9 +102,134 @@ async function main() {
 
   console.log('Created Movies');
 
-  // 4. Create Showtimes
-  // Today date
+  const [badgeFirstReview, badgeWatchlistStarter, badgeSocial] = await Promise.all([
+    prisma.badge.create({
+      data: {
+        id: 'first_review',
+        name: 'Primera Reseña',
+        description: 'Escribe tu primera reseña y gana reconocimiento cinematográfico.',
+        icon: '📝',
+        xpReward: 50,
+      },
+    }),
+    prisma.badge.create({
+      data: {
+        id: 'watchlist_starter',
+        name: 'Watchlist Premier',
+        description: 'Agrega tu primera película a la Watchlist.',
+        icon: '🎬',
+        xpReward: 20,
+      },
+    }),
+    prisma.badge.create({
+      data: {
+        id: 'social_stalker',
+        name: 'Cine Social',
+        description: 'Comparte actividad social y conéctate con otros cinéfilos.',
+        icon: '🌐',
+        xpReward: 30,
+      },
+    }),
+  ]);
+
+  const [rewardPopcorn, rewardUpgrade, rewardPass] = await Promise.all([
+    prisma.reward.create({
+      data: {
+        id: 'discount_popcorn',
+        name: 'Popcorn Premium',
+        description: '10% de descuento en combos de pochoclos en tu próxima función.',
+        cost: 100,
+        imageUrl: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=600&q=80',
+      },
+    }),
+    prisma.reward.create({
+      data: {
+        id: 'free_upgrade',
+        name: 'Upgrade de Sala',
+        description: 'Obtén un upgrade a una sala premium para tu próxima compra.',
+        cost: 250,
+        imageUrl: 'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=600&q=80',
+      },
+    }),
+    prisma.reward.create({
+      data: {
+        id: 'member_pass',
+        name: 'Pase VIP Semanal',
+        description: 'Accede a descuentos exclusivos durante una semana.',
+        cost: 450,
+        imageUrl: 'https://images.unsplash.com/photo-1523731407965-2430cd12f5e4?auto=format&fit=crop&w=600&q=80',
+      },
+    }),
+  ]);
+
   const now = new Date();
+
+  const specialEvent = await prisma.event.create({
+    data: {
+      title: 'Noche de Cine Premium',
+      slug: 'noche-de-cine-premium',
+      description: 'Una experiencia inmersiva con avance exclusivo y premios para los mejores fans.',
+      category: 'Especial',
+      startDate: new Date(now.getFullYear(), now.getMonth(), now.getDate() + 3, 20, 0, 0),
+      endDate: new Date(now.getFullYear(), now.getMonth(), now.getDate() + 3, 23, 0, 0),
+      imageUrl: 'https://images.unsplash.com/photo-1517602302552-471fe67acf66?auto=format&fit=crop&w=800&q=80',
+      isOnline: false,
+      status: 'ACTIVE',
+    },
+  });
+
+  const watchlistItem = await prisma.watchlistItem.create({
+    data: {
+      user: { connect: { id: clientUser.id } },
+      movie: { connect: { id: movie1.id } },
+      isFavorite: true,
+      status: 'WATCHED',
+    },
+  });
+
+  const review1 = await prisma.review.create({
+    data: {
+      rating: 5,
+      comment: 'Una experiencia visual y emocional increíble con giros de narrativa impecables.',
+      user: { connect: { id: clientUser.id } },
+      movie: { connect: { id: movie1.id } },
+    },
+  });
+
+  await prisma.userBadge.create({
+    data: {
+      user: { connect: { id: clientUser.id } },
+      badge: { connect: { id: badgeFirstReview.id } },
+    },
+  });
+
+  await prisma.socialActivity.create({
+    data: {
+      user: { connect: { id: clientUser.id } },
+      type: 'REVIEW',
+      movie: { connect: { id: movie1.id } },
+      content: 'Acabo de escribir una reseña de Inception. Un viaje imperdible.',
+    },
+  });
+
+  const movieRequest = await prisma.movieRequest.create({
+    data: {
+      movie: { connect: { id: movie3.id } },
+      createdBy: { connect: { id: clientUser.id } },
+      reason: 'Deseo una función especial con Interstellar para experimentar la banda sonora en vivo.',
+    },
+  });
+
+  await prisma.requestVote.create({
+    data: {
+      request: { connect: { id: movieRequest.id } },
+      user: { connect: { id: clientUser.id } },
+    },
+  });
+
+  console.log('Created Movies and SaaS starter content');
+
+  // 4. Create Showtimes
   const today18 = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 18, 0, 0);
   const today21 = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 21, 15, 0);
   const tomorrow16 = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 16, 30, 0);

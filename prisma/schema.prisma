@@ -8,24 +8,34 @@ generator client {
 }
 
 model User {
-  id            Int            @id @default(autoincrement())
-  name          String
-  email         String         @unique
-  password      String
-  role          String         @default("CLIENT") // "SUPERADMIN", "ADMIN", "CLIENT"
-  cinemaId      Int?
-  cinema        Cinema?        @relation(fields: [cinemaId], references: [id], onDelete: SetNull)
-  tickets       Ticket[]
-  reviews       Review[]
-  movieRequests MovieRequest[]
-  votes         RequestVote[]
-  createdAt     DateTime       @default(now())
+  id              Int               @id @default(autoincrement())
+  name            String
+  email           String            @unique
+  password        String
+  role            String            @default("CLIENT") // "SUPERADMIN", "ADMIN", "CLIENT"
+  avatarUrl       String?
+  favoriteGenres  String?
+  xp              Int               @default(0)
+  rewardsPoints   Int               @default(0)
+  cinemaId        Int?
+  cinema          Cinema?           @relation(fields: [cinemaId], references: [id], onDelete: SetNull)
+  tickets         Ticket[]
+  reviews         Review[]
+  movieRequests   MovieRequest[]    @relation("CreatedRequests")
+  votes           RequestVote[]
+  watchlistItems  WatchlistItem[]
+  badges          UserBadge[]
+  userRewards     UserReward[]
+  followings      Follow[]          @relation("followerRelation")
+  followers       Follow[]          @relation("followingRelation")
+  activities      SocialActivity[]
+  createdAt       DateTime          @default(now())
 }
 
 model Cinema {
   id        Int        @id @default(autoincrement())
   name      String
-  slug      String     @unique // Subdomain or identifier, e.g. "cineplex-central"
+  slug      String     @unique
   address   String
   users     User[]
   movies    Movie[]
@@ -34,18 +44,25 @@ model Cinema {
 }
 
 model Movie {
-  id          Int        @id @default(autoincrement())
-  title       String
-  description String
-  duration    Int        // in minutes
-  rating      String     // e.g. "G", "PG", "PG-13", "R"
-  genre       String
-  imageUrl    String
-  cinemaId    Int
-  cinema      Cinema     @relation(fields: [cinemaId], references: [id], onDelete: Cascade)
-  showtimes   Showtime[]
-  reviews     Review[]
-  createdAt   DateTime   @default(now())
+  id                 Int               @id @default(autoincrement())
+  title              String
+  description        String
+  duration           Int               // in minutes
+  rating             String            // e.g. "G", "PG", "PG-13", "R"
+  genre              String
+  genres             String[]          @default([])
+  imageUrl           String
+  trailerUrl         String?
+  featured           Boolean           @default(false)
+  availableForRequest Boolean          @default(false)
+  cinemaId           Int
+  cinema             Cinema            @relation(fields: [cinemaId], references: [id], onDelete: Cascade)
+  showtimes          Showtime[]
+  reviews            Review[]
+  watchlistItems     WatchlistItem[]
+  socialActivities   SocialActivity[]
+  requests           MovieRequest[]
+  createdAt          DateTime          @default(now())
 }
 
 model Showtime {
@@ -76,7 +93,7 @@ model Ticket {
   pricePaid  Float
   createdAt  DateTime @default(now())
 
-  @@unique([showtimeId, row, col]) // Prevents double booking of the exact same seat
+  @@unique([showtimeId, row, col])
 }
 
 model Review {
@@ -87,19 +104,46 @@ model Review {
   movie     Movie    @relation(fields: [movieId], references: [id], onDelete: Cascade)
   comment   String
   rating    Int      // 1 to 5 stars
+  likes     ReviewLike[]
   createdAt DateTime @default(now())
 
-  @@unique([userId, movieId]) // One review per user per movie
+  @@unique([userId, movieId])
+}
+
+model ReviewLike {
+  id        Int      @id @default(autoincrement())
+  reviewId  Int
+  review    Review   @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([reviewId, userId])
+}
+
+model WatchlistItem {
+  id         Int      @id @default(autoincrement())
+  userId     Int
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  movieId    Int
+  movie      Movie    @relation(fields: [movieId], references: [id], onDelete: Cascade)
+  isFavorite Boolean  @default(false)
+  status     String   @default("WATCHLIST") // WATCHLIST, WATCHED, IN_PROGRESS
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([userId, movieId])
 }
 
 model MovieRequest {
   id          Int           @id @default(autoincrement())
-  userId      Int
-  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  title       String
-  description String?
+  movieId     Int
+  movie       Movie         @relation(fields: [movieId], references: [id], onDelete: Cascade)
+  createdById Int?
+  createdBy   User?         @relation("CreatedRequests", fields: [createdById], references: [id], onDelete: SetNull)
   votes       RequestVote[]
   status      String        @default("PENDING") // "PENDING", "APPROVED", "REJECTED"
+  isActive    Boolean       @default(true)
   createdAt   DateTime      @default(now())
 }
 
@@ -111,5 +155,80 @@ model RequestVote {
   user       User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt  DateTime     @default(now())
 
-  @@unique([requestId, userId]) // One vote per user per request
+  @@unique([requestId, userId])
+}
+
+model Follow {
+  id          Int    @id @default(autoincrement())
+  followerId  Int
+  followingId Int
+  follower    User   @relation("followerRelation", fields: [followerId], references: [id], onDelete: Cascade)
+  following   User   @relation("followingRelation", fields: [followingId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+
+  @@unique([followerId, followingId])
+}
+
+model SocialActivity {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String
+  movieId   Int?
+  movie     Movie?   @relation(fields: [movieId], references: [id], onDelete: SetNull)
+  content   String?
+  createdAt DateTime @default(now())
+}
+
+model Event {
+  id          Int      @id @default(autoincrement())
+  title       String
+  slug        String   @unique
+  description String
+  category    String
+  startDate   DateTime
+  endDate     DateTime
+  imageUrl    String
+  isOnline    Boolean  @default(false)
+  status      String   @default("ACTIVE")
+  createdAt   DateTime @default(now())
+}
+
+model Badge {
+  id          String      @id
+  name        String
+  description String
+  icon        String
+  xpReward    Int
+  users       UserBadge[]
+}
+
+model UserBadge {
+  id         Int      @id @default(autoincrement())
+  userId     Int
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  badgeId    String
+  badge      Badge    @relation(fields: [badgeId], references: [id], onDelete: Restrict)
+  unlockedAt DateTime @default(now())
+
+  @@unique([userId, badgeId])
+}
+
+model Reward {
+  id          String       @id
+  name        String
+  description String
+  cost        Int
+  imageUrl    String?
+  claims      UserReward[]
+}
+
+model UserReward {
+  id         Int      @id @default(autoincrement())
+  userId     Int
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  rewardId   String
+  reward     Reward   @relation(fields: [rewardId], references: [id], onDelete: Restrict)
+  createdAt  DateTime @default(now())
+  status     String   @default("REDEEMED")
 }
